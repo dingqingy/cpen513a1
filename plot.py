@@ -1,4 +1,5 @@
 from tkinter import *
+from tkinter import ttk
 COLORS = ['black', 'red', 'yellow', 'azure4', 'orange', 'maroon', 'pink', 'lime green', 'dark violet', 'green']
 
 
@@ -21,7 +22,7 @@ def plot(canvas, grid_size, obstacles, wires):
 
 if __name__ == '__main__':
     root = Tk()
-    frame = Frame(root, width=1000, height=500)
+    frame = ttk.Frame(root, width=1000, height=500)
     frame.pack()
     c = Canvas(frame, bg='white', width=1000, height=500)
     c.pack()
