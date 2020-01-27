@@ -2,14 +2,19 @@ from utils import *
 from plot import *
 import numpy as np
 from queue import PriorityQueue as PQ
+import argparse
 
 
 class Router:
     def __init__(self, infile):
         self.grid_size, self.obstacles, self.wires = parse_input(infile)
+        self.routed_path = [[] for _ in range(len(self.wires))]
+        # print('init routed path', self.routed_path)
+        self.startGUI()
+        self.plot()
 
     # GUI
-    def start_gui(self, width=1000, height=500, background_color='white'):
+    def startGUI(self, width=1000, height=500, background_color='white'):
         '''
         set up GUI
         '''
@@ -18,9 +23,22 @@ class Router:
         self.frame.pack()
         self.canvas = Canvas(self.frame, bg=background_color, width=width, height=height)
         self.canvas.pack()
+        self.step_single = ttk.Button(self.frame, text="Single Step", command=self.visualSingleStep)
+        self.step_single.pack()
+        self.step_wire = ttk.Button(self.frame, text="Connect a Wire", command=self.visualSingleWire)
+        self.step_wire.pack()
+
+        # display final result
+        self.step_all = ttk.Button(self.frame, text="Show Final Result", command=self.visualFinalSolution)
+        self.step_all.pack()
+
+        # reset 
+        self.step_all = ttk.Button(self.frame, text="Reset", command=self.resetVisual)
+        self.step_all.pack()
         # self.root.mainloop()
 
-    def plot_init(self, width=1000, height=500):
+    # modify for generic plotting function
+    def plot(self, width=1000, height=500):
         x_bound, y_bound = self.grid_size
         sizex = width / x_bound
         sizey = height / y_bound
@@ -34,10 +52,41 @@ class Router:
                     self.canvas.create_rectangle(sizex * i, sizey * j, sizex * (i + 1), sizey * (j + 1), fill='white')
                 # draw wires
                 for k, wire in enumerate(self.wires):
+                    if (i, j) in self.routed_path[k]:
+                        self.canvas.create_rectangle(sizex * i, sizey * j, sizex * (i + 1), sizey * (j + 1), fill=COLORS[k + 1])
                     if (i, j) in wire:
                         self.canvas.create_rectangle(sizex * i, sizey * j, sizex * (i + 1), sizey * (j + 1), fill=COLORS[k + 1])
                         self.canvas.create_text(sizex * (i + 0.5), sizey * (j + 0.5), text=k + 1)
 
+    # have a global display state
+    # detailed implementation later, start from final solution
+    def visualSingleStep(self):
+        print('single step a routing progress')
+
+    def visualSingleWire(self):
+        print('visualize single wire connection')
+
+    def visualFinalSolution(self):
+        self.routeAll()
+        self.plot()
+        print('visualize final solution')
+
+    def resetVisual(self):
+        # call reset method that clears all internal states
+        self.reset()
+        self.plot()
+        print('reset')
+
+    def reset(self):
+        self.routed_path = [[] for _ in range(len(self.wires))]
+        self.plot()
+    
+    def routeAll(self):
+        for i in range(len(self.wires)):
+            self.routed_path[i] = self.routeOneNet(self.wires[i])
+        # TODO: show a final message on solved wires, pins etc
+
+    # router
     def routeOneNet(self, wire):
         num_pins = len(wire)
         # TODO: init best result here
@@ -83,6 +132,10 @@ class Router:
         for obstacle in self.obstacles:
             self.label[obstacle] = np.Inf
         # FIXME: routed paths are obstacles too!
+        for path in self.routed_path:
+            for coordinate in path:
+                self.label[coordinate] = np.Inf
+
         # unrouted pins are obstacles too
         for wire in self.wires:
             for pin in wire:
@@ -199,7 +252,11 @@ class Router:
 
 
 if __name__ == '__main__':
-    router = Router('benchmarks/example.infile')
+    parser = argparse.ArgumentParser(description='Run Timeloop')
+    parser.add_argument('--infile', '-i', default='benchmarks/example.infile', help='input file') # yaml
+    args = parser.parse_args()
+
+    router = Router(args.infile)
     # test Lee Moore on single source and target
     # router.shortestPath([(10, 1)], [(2, 7)])
     # test Lee Moore on single source and multiple target
@@ -207,10 +264,10 @@ if __name__ == '__main__':
     # test Lee Moore on multiple source and single target
     # router.shortestPath([(8, 3), (7, 3), (7, 4), (7, 5), (7, 6), (7, 7)], [(10, 7)])
     # test visualization
-    router.start_gui()
-    router.plot_init()
-    for i in range(len(router.wires)):
-        print('test net', i)
-        router.routeOneNet(router.wires[i])
-        print('')
+    # router.start_gui()
+    # router.plot_init()
+    # for i in range(len(router.wires)):
+    #     print('test net', i)
+    #     router.routeOneNet(router.wires[i])
+    #     print('')
     router.root.mainloop()
