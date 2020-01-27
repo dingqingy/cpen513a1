@@ -1,3 +1,6 @@
+import argparse
+
+
 def parse_input(infile):
     with open(infile, 'r') as f:
         grid_size = tuple([int(x) for x in f.readline().rstrip('\n').split(' ')])
@@ -24,7 +27,10 @@ def parse_input(infile):
 
 
 if __name__ == "__main__":
-    grid_size, obstacles, wires = parse_input('benchmarks/example.infile')
-    print(grid_size)
-    print(obstacles)
-    print(wires)
+    parser = argparse.ArgumentParser(description='Run Timeloop')
+    parser.add_argument('--infile', '-i', default='benchmarks/example.infile', help='input file') # yaml
+    args = parser.parse_args()
+    grid_size, obstacles, wires = parse_input(args.infile)
+    print('grid size: ', grid_size)
+    print('obstacles: ', obstacles)
+    print('wires: ', wires)

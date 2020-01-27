@@ -2,6 +2,7 @@ from utils import *
 from plot import *
 import numpy as np
 from queue import PriorityQueue as PQ
+import copy
 import argparse
 
 
@@ -32,9 +33,13 @@ class Router:
         self.step_all = ttk.Button(self.frame, text="Show Final Result", command=self.visualFinalSolution)
         self.step_all.pack()
 
+        # reset button 
+        self.reset_button = ttk.Button(self.frame, text="Reset", command=self.resetVisual)
+        self.reset_button.pack()
+
         # reset 
-        self.step_all = ttk.Button(self.frame, text="Reset", command=self.resetVisual)
-        self.step_all.pack()
+        self.debug_button = ttk.Button(self.frame, text="Debug Plot", command=self.plot)
+        self.debug_button.pack()
         # self.root.mainloop()
 
     # modify for generic plotting function
@@ -81,22 +86,36 @@ class Router:
         self.routed_path = [[] for _ in range(len(self.wires))]
         self.plot()
     
+    # Router functionality
     def routeAll(self):
+        total_segments = 0
+        total_possible_segments = 0
         for i in range(len(self.wires)):
-            self.routed_path[i] = self.routeOneNet(self.wires[i])
+            routed_segments, self.routed_path[i] = self.routeOneNet(self.wires[i])
+            total_segments += routed_segments
+            total_possible_segments += len(self.wires[i])-1
         # TODO: show a final message on solved wires, pins etc
+        if total_segments == total_possible_segments:
+            print('Success, route {} / {} segments'.format(total_segments, total_possible_segments))
+        else:
+            print('Failed, route {} / {} segments'.format(total_segments, total_possible_segments))
 
-    # router
+        # TODO: also compare other stategy includes exploit easy connection first
+    
+    # greedy that tries to connect as many pins as possible
     def routeOneNet(self, wire):
         num_pins = len(wire)
+        max_segments = 0
+        best_routed = []
         # TODO: init best result here
         for i in range(num_pins):
-            routed = [wire[i]]
-            targets = wire[:i] + wire[(i + 1):]
+            num_segments = 0
+            routed = [wire[i]] # this is the staring pin
+            targets = wire[:i] + wire[(i + 1):] # every other pin is the target
             print('start with {} source pin'.format(i))
-            print('the whole wire', wire)
-            print('current routed', routed)
-            print('current targets', targets)
+            # print('the whole wire', wire)
+            # print('current routed', routed)
+            # print('current targets', targets)
             while targets:
                 result = self.shortestPath(routed, targets)
                 if result is not None:
@@ -105,22 +124,29 @@ class Router:
                         if not coordinate in routed:
                             routed.append(coordinate)
                     print('updated route:', routed)
-                    # update target
+                    # remove found target
                     for target in targets:
                         if target in result:
                             targets.remove(target)
                     print('updated target:', targets)
+                    num_segments += 1
                 else:
-                    # routing for this net failed
-                    # record how many pins we connect
-                    # TODO: drop the current starting pin, attemps to route as many pins as possible when routing failed
-                    pass
+                    print('we are not able to connect further, the current # of segments is', num_segments)
+                    break
 
-            # successfully route all pins when starting with a pin, also try start with another pin
-            print('full route:', routed)
-            return routed  # this only returns a valid solution, possibly not the best
+            if num_segments > max_segments:
+                max_segments = num_segments
+                best_routed = copy.deepcopy(routed)
+
+        # print('best route:', best_routed)
+        # print('max segments / potential segments: {} / {}'.format(max_segments, num_pins-1))
+        return max_segments, best_routed  
         # fail to route this wire, provide the best routed result that connects most of the pins
         # return best result
+
+    # greedy that tries to maximize # wires get connected
+    def routeClosest(self):
+        pass
 
     def shortestPath(self, sources, targets):
         '''
@@ -257,6 +283,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     router = Router(args.infile)
+    router.routeOneNet(router.wires[0])
+    router.plot()
+
     # test Lee Moore on single source and target
     # router.shortestPath([(10, 1)], [(2, 7)])
     # test Lee Moore on single source and multiple target
