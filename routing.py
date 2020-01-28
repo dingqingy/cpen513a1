@@ -9,8 +9,8 @@ import argparse
 class Router:
     def __init__(self, infile):
         self.grid_size, self.obstacles, self.wires = parse_input(infile)
-        self.routed_path = [[] for _ in range(len(self.wires))]
-        # print('init routed path', self.routed_path)
+        self.resetInternalState()
+        self.best_routed_path = [[] for _ in range(len(self.wires))]
         self.startGUI()
         self.plot()
 
@@ -57,7 +57,7 @@ class Router:
                     self.canvas.create_rectangle(sizex * i, sizey * j, sizex * (i + 1), sizey * (j + 1), fill='white')
                 # draw wires
                 for k, wire in enumerate(self.wires):
-                    if (i, j) in self.routed_path[k]:
+                    if (i, j) in self.best_routed_path[k]:
                         self.canvas.create_rectangle(sizex * i, sizey * j, sizex * (i + 1), sizey * (j + 1), fill=COLORS[k + 1])
                     if (i, j) in wire:
                         self.canvas.create_rectangle(sizex * i, sizey * j, sizex * (i + 1), sizey * (j + 1), fill=COLORS[k + 1])
@@ -78,16 +78,39 @@ class Router:
 
     def resetVisual(self):
         # call reset method that clears all internal states
-        self.reset()
+        self.resetInternalState()
         self.plot()
         print('reset')
 
-    def reset(self):
+    def resetInternalState(self):
         self.routed_path = [[] for _ in range(len(self.wires))]
-        self.plot()
+        self.label = np.zeros(self.grid_size)
+        self.expansion_list = PQ()
+        self.net_ordering = PQ()
     
     # Router functionality
     def routeAll(self):
+        best_total_segments = 0
+
+        # traverse nets in linear order
+        total_segments = self.linearOrder()
+        if total_segments > best_total_segments:
+            best_total_segments = total_segments
+            self.best_routed_path = copy.deepcopy(self.routed_path)
+
+        # solve simple nets (less pin and distance)
+        total_segments = self.solveSimpleFirst()
+        if total_segments > best_total_segments:
+            best_total_segments = total_segments
+            self.best_routed_path = copy.deepcopy(self.routed_path)
+
+        # maybe we will do 
+
+    def linearOrder(self):
+        '''
+        naive approach that attempts to connect wires/segments in input order
+        '''
+        self.resetInternalState()
         total_segments = 0
         total_possible_segments = 0
         for i in range(len(self.wires)):
@@ -96,11 +119,37 @@ class Router:
             total_possible_segments += len(self.wires[i])-1
         # TODO: show a final message on solved wires, pins etc
         if total_segments == total_possible_segments:
-            print('Success, route {} / {} segments'.format(total_segments, total_possible_segments))
+            print('Linear Order Success, Route {} / {} segments'.format(total_segments, total_possible_segments))
         else:
-            print('Failed, route {} / {} segments'.format(total_segments, total_possible_segments))
+            print('Linear Order Failed, Route {} / {} segments'.format(total_segments, total_possible_segments))
+        return total_segments
 
-        # TODO: also compare other stategy includes exploit easy connection first
+    
+    def solveSimpleFirst(self):
+        '''
+        Heristic: connect simple wires first
+        simple is defined based on L1 distance between all pins within a wire
+        '''
+        self.resetInternalState()
+        total_segments = 0
+        total_possible_segments = 0
+
+        # detemine simple by evaluating total L1 distance
+        for wire_id, wire in enumerate(self.wires):
+            # self.net_ordering.put((totalL1Distance(wire), wire_id))
+            self.net_ordering.put((totalL1Distance(wire), wire_id))            
+
+        while not self.net_ordering.empty():
+            _, i = self.net_ordering.get()
+            routed_segments, self.routed_path[i] = self.routeOneNet(self.wires[i])
+            total_segments += routed_segments
+            total_possible_segments += len(self.wires[i])-1
+        # TODO: show a final message on solved wires, pins etc
+        if total_segments == total_possible_segments:
+            print('Simple First Success, Route {} / {} segments'.format(total_segments, total_possible_segments))
+        else:
+            print('Simple First Failed, Route {} / {} segments'.format(total_segments, total_possible_segments))
+        return total_segments
     
     # greedy that tries to connect as many pins as possible
     def routeOneNet(self, wire):
@@ -112,7 +161,7 @@ class Router:
             num_segments = 0
             routed = [wire[i]] # this is the staring pin
             targets = wire[:i] + wire[(i + 1):] # every other pin is the target
-            print('start with {} source pin'.format(i))
+            # print('start with {} source pin'.format(i))
             # print('the whole wire', wire)
             # print('current routed', routed)
             # print('current targets', targets)
@@ -123,15 +172,15 @@ class Router:
                     for coordinate in result:
                         if not coordinate in routed:
                             routed.append(coordinate)
-                    print('updated route:', routed)
+                    # print('updated route:', routed)
                     # remove found target
                     for target in targets:
                         if target in result:
                             targets.remove(target)
-                    print('updated target:', targets)
+                    # print('updated target:', targets)
                     num_segments += 1
                 else:
-                    print('we are not able to connect further, the current # of segments is', num_segments)
+                    # print('we are not able to connect further, the current # of segments is', num_segments)
                     break
 
             if num_segments > max_segments:
@@ -176,11 +225,11 @@ class Router:
         while not self.expansion_list.empty():
             _, coordinate = self.expansion_list.get()
             if coordinate in targets:
-                print('target at {} found!'.format(coordinate))
-                print('label map')
-                print(self.label.T)
+                # print('target at {} found!'.format(coordinate))
+                # print('label map')
+                # print(self.label.T)
                 solution = self.backTrack(coordinate, sources)
-                print('routing solution: {}'.format(solution))
+                # print('routing solution: {}'.format(solution))
                 return solution
             # expand all neighbours
             self.expand(coordinate)

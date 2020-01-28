@@ -1,5 +1,5 @@
 import argparse
-
+from itertools import combinations
 
 def parse_input(infile):
     with open(infile, 'r') as f:
@@ -25,6 +25,24 @@ def parse_input(infile):
 
     return grid_size, obstacles, wires
 
+def totalL1Distance(pins):
+    sum = 0
+    for pin_a, pin_b in combinations(pins, 2):
+        x_a, y_a = pin_a
+        x_b, y_b = pin_b
+        sum += abs(x_a - x_b) + abs(y_a - y_b)
+    return sum
+
+def averageL1Distance(pins):
+    sum = 0
+    count = 0
+    for pin_a, pin_b in combinations(pins, 2):
+        x_a, y_a = pin_a
+        x_b, y_b = pin_b
+        count += 1
+        sum += abs(x_a - x_b) + abs(y_a - y_b)
+    return sum/count
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run Timeloop')
@@ -34,3 +52,5 @@ if __name__ == "__main__":
     print('grid size: ', grid_size)
     print('obstacles: ', obstacles)
     print('wires: ', wires)
+
+    print('total L1', totalL1Distance([(3, 4), (1, 2), (5, 6)]))
