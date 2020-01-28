@@ -1,9 +1,12 @@
 from utils import *
-from plot import *
+# from plot import *
 import numpy as np
 from queue import PriorityQueue as PQ
 import copy
 import argparse
+from tkinter import *
+from tkinter import ttk
+COLORS = ['black', 'red', 'yellow', 'azure4', 'orange', 'maroon', 'pink', 'lime green', 'dark violet', 'green']
 
 
 class Router:
@@ -12,7 +15,7 @@ class Router:
         self.grid_size, self.obstacles, self.wires = parse_input(infile)
         self.total_possible_segments = 0
         for wire in self.wires:
-            self.total_possible_segments += len(wire)-1
+            self.total_possible_segments += len(wire) - 1
         # print('Total possible segments:', self.total_possible_segments)
         self.resetAll()
         self.startGUI()
@@ -37,11 +40,11 @@ class Router:
         self.step_all = ttk.Button(self.frame, text="Show Final Result", command=self.visualFinalSolution)
         self.step_all.pack()
 
-        # reset button 
+        # reset button
         self.reset_button = ttk.Button(self.frame, text="Reset", command=self.resetVisual)
         self.reset_button.pack()
 
-        # debug 
+        # debug
         # self.debug_button = ttk.Button(self.frame, text="Debug Plot", command=self.plot)
         # self.debug_button.pack()
         # self.root.mainloop()
@@ -76,47 +79,50 @@ class Router:
     #     print('visualize single wire connection')
 
     def visualFinalSolution(self):
+        ''' Display the final routing solution in the GUI'''
         self.routeAll()
         self.plot()
         print('visualize final solution')
 
     def resetVisual(self):
-        # call reset method that clears all internal states
+        ''' Reset the GUI to initial state'''
         self.resetAll()
         self.plot()
         print('reset')
 
     def resetAll(self):
+        ''' Reset all members'''
         self.resetInternalState()
         # reset global state
         self.best_routed_path = [[] for _ in range(len(self.wires))]
         self.best_total_segments = 0
 
     def resetInternalState(self):
+        ''' Reset members for the current state'''
         self.routed_path = [[] for _ in range(len(self.wires))]
         self.label = np.zeros(self.grid_size)
         self.expansion_list = PQ()
         self.net_ordering = PQ()
-    
+
     # Router functionality
     def routeAll(self):
         self.best_total_segments = 0
 
-        # traverse nets in linear order
-        total_segments = self.linearOrder()
-        if total_segments > self.best_total_segments:
-            self.best_total_segments = total_segments
-            self.best_routed_path = copy.deepcopy(self.routed_path)
+        # # traverse nets in linear order
+        # total_segments = self.linearOrder()
+        # if total_segments > self.best_total_segments:
+        #     self.best_total_segments = total_segments
+        #     self.best_routed_path = copy.deepcopy(self.routed_path)
 
-        # solve simple nets (less pin and distance)
-        total_segments = self.solveSimpleFirst()
-        if total_segments > self.best_total_segments:
-            self.best_total_segments = total_segments
-            self.best_routed_path = copy.deepcopy(self.routed_path)
-        
-        # solve simple nets (less pin and distance)
+        # # solve simple nets (less pin and distance)
+        # total_segments = self.solveSimpleFirst()
+        # if total_segments > self.best_total_segments:
+        #     self.best_total_segments = total_segments
+        #     self.best_routed_path = copy.deepcopy(self.routed_path)
+
+        # solve simple nets previously failed nets first
         self.solveSimpleFirstIterative()
-        # maybe we will do 
+        # maybe we will do
 
     def linearOrder(self):
         '''
@@ -136,7 +142,6 @@ class Router:
                 print('Linear Order Failed, Route {} / {} segments'.format(total_segments, self.total_possible_segments))
         return total_segments
 
-    
     def solveSimpleFirst(self):
         '''
         Heristic: connect simple wires first
@@ -148,7 +153,7 @@ class Router:
         # detemine simple by evaluating total L1 distance
         for wire_id, wire in enumerate(self.wires):
             # self.net_ordering.put((totalL1Distance(wire), wire_id))
-            self.net_ordering.put((totalL1Distance(wire), wire_id))            
+            self.net_ordering.put((totalL1Distance(wire), wire_id))
 
         while not self.net_ordering.empty():
             _, i = self.net_ordering.get()
@@ -177,17 +182,17 @@ class Router:
             # detemine simple by evaluating total L1 distance
             for wire_id, wire in enumerate(self.wires):
                 # self.net_ordering.put((totalL1Distance(wire), wire_id))
-                self.net_ordering.put((averageL1Distance(wire)-cost[wire_id], wire_id)) # lower score, higher priority          
+                self.net_ordering.put((averageL1Distance(wire) - cost[wire_id], wire_id))  # lower score, higher priority
 
             while not self.net_ordering.empty():
                 _, wire_id = self.net_ordering.get()
                 routed_segments, self.routed_path[wire_id] = self.routeOneNet(self.wires[wire_id])
-                possible_segments = len(self.wires[wire_id])-1
+                possible_segments = len(self.wires[wire_id]) - 1
 
                 # if we are not able to route this wire, we increase the cost
                 if routed_segments < possible_segments:
-                    cost[wire_id] += 5
-                
+                    cost[wire_id] += 10
+
                 total_segments += routed_segments
             # TODO: show a final message on solved wires, pins etc
             if total_segments == self.total_possible_segments:
@@ -199,7 +204,7 @@ class Router:
             if self.best_total_segments < total_segments:
                 self.best_total_segments = total_segments
                 self.best_routed_path = copy.deepcopy(self.routed_path)
-    
+
     # greedy that tries to connect as many pins as possible
     def routeOneNet(self, wire):
         num_pins = len(wire)
@@ -208,8 +213,8 @@ class Router:
         # TODO: init best result here
         for i in range(num_pins):
             num_segments = 0
-            routed = [wire[i]] # this is the staring pin
-            targets = wire[:i] + wire[(i + 1):] # every other pin is the target
+            routed = [wire[i]]  # this is the staring pin
+            targets = wire[:i] + wire[(i + 1):]  # every other pin is the target
             # print('start with {} source pin'.format(i))
             # print('the whole wire', wire)
             # print('current routed', routed)
@@ -238,7 +243,7 @@ class Router:
 
         # print('best route:', best_routed)
         # print('max segments / potential segments: {} / {}'.format(max_segments, num_pins-1))
-        return max_segments, best_routed  
+        return max_segments, best_routed
         # fail to route this wire, provide the best routed result that connects most of the pins
         # return best result
 
@@ -377,7 +382,7 @@ class Router:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run Timeloop')
-    parser.add_argument('--infile', '-i', default='benchmarks/example.infile', help='input file') # yaml
+    parser.add_argument('--infile', '-i', default='benchmarks/example.infile', help='input file')  # yaml
     args = parser.parse_args()
 
     router = Router(args.infile, verbose=True)
