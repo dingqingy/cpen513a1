@@ -7,8 +7,13 @@ import argparse
 
 
 class Router:
-    def __init__(self, infile):
+    def __init__(self, infile, verbose=False):
+        self.verbose = verbose
         self.grid_size, self.obstacles, self.wires = parse_input(infile)
+        self.total_possible_segments = 0
+        for wire in self.wires:
+            self.total_possible_segments += len(wire)-1
+        # print('Total possible segments:', self.total_possible_segments)
         self.resetAll()
         self.startGUI()
         self.plot()
@@ -23,10 +28,10 @@ class Router:
         self.frame.pack()
         self.canvas = Canvas(self.frame, bg=background_color, width=width, height=height)
         self.canvas.pack()
-        self.step_single = ttk.Button(self.frame, text="Single Step", command=self.visualSingleStep)
-        self.step_single.pack()
-        self.step_wire = ttk.Button(self.frame, text="Connect a Wire", command=self.visualSingleWire)
-        self.step_wire.pack()
+        # self.step_single = ttk.Button(self.frame, text="Single Step", command=self.visualSingleStep)
+        # self.step_single.pack()
+        # self.step_wire = ttk.Button(self.frame, text="Connect a Wire", command=self.visualSingleWire)
+        # self.step_wire.pack()
 
         # display final result
         self.step_all = ttk.Button(self.frame, text="Show Final Result", command=self.visualFinalSolution)
@@ -36,9 +41,9 @@ class Router:
         self.reset_button = ttk.Button(self.frame, text="Reset", command=self.resetVisual)
         self.reset_button.pack()
 
-        # reset 
-        self.debug_button = ttk.Button(self.frame, text="Debug Plot", command=self.plot)
-        self.debug_button.pack()
+        # debug 
+        # self.debug_button = ttk.Button(self.frame, text="Debug Plot", command=self.plot)
+        # self.debug_button.pack()
         # self.root.mainloop()
 
     # modify for generic plotting function
@@ -64,11 +69,11 @@ class Router:
 
     # have a global display state
     # detailed implementation later, start from final solution
-    def visualSingleStep(self):
-        print('single step a routing progress')
+    # def visualSingleStep(self):
+    #     print('single step a routing progress')
 
-    def visualSingleWire(self):
-        print('visualize single wire connection')
+    # def visualSingleWire(self):
+    #     print('visualize single wire connection')
 
     def visualFinalSolution(self):
         self.routeAll()
@@ -119,16 +124,16 @@ class Router:
         '''
         self.resetInternalState()
         total_segments = 0
-        total_possible_segments = 0
         for i in range(len(self.wires)):
             routed_segments, self.routed_path[i] = self.routeOneNet(self.wires[i])
             total_segments += routed_segments
-            total_possible_segments += len(self.wires[i])-1
         # TODO: show a final message on solved wires, pins etc
-        if total_segments == total_possible_segments:
-            print('Linear Order Success, Route {} / {} segments'.format(total_segments, total_possible_segments))
+        if total_segments == self.total_possible_segments:
+            if self.verbose:
+                print('Linear Order Success, Route {} / {} segments'.format(total_segments, self.total_possible_segments))
         else:
-            print('Linear Order Failed, Route {} / {} segments'.format(total_segments, total_possible_segments))
+            if self.verbose:
+                print('Linear Order Failed, Route {} / {} segments'.format(total_segments, self.total_possible_segments))
         return total_segments
 
     
@@ -139,7 +144,6 @@ class Router:
         '''
         self.resetInternalState()
         total_segments = 0
-        total_possible_segments = 0
 
         # detemine simple by evaluating total L1 distance
         for wire_id, wire in enumerate(self.wires):
@@ -150,12 +154,13 @@ class Router:
             _, i = self.net_ordering.get()
             routed_segments, self.routed_path[i] = self.routeOneNet(self.wires[i])
             total_segments += routed_segments
-            total_possible_segments += len(self.wires[i])-1
         # TODO: show a final message on solved wires, pins etc
-        if total_segments == total_possible_segments:
-            print('Simple First Success, Route {} / {} segments'.format(total_segments, total_possible_segments))
+        if total_segments == self.total_possible_segments:
+            if self.verbose:
+                print('Simple First Success, Route {} / {} segments'.format(total_segments, self.total_possible_segments))
         else:
-            print('Simple First Failed, Route {} / {} segments'.format(total_segments, total_possible_segments))
+            if self.verbose:
+                print('Simple First Failed, Route {} / {} segments'.format(total_segments, self.total_possible_segments))
         return total_segments
 
     def solveSimpleFirstIterative(self, iter=5):
@@ -168,7 +173,6 @@ class Router:
         for i in range(iter):
             self.resetInternalState()
             total_segments = 0
-            total_possible_segments = 0
 
             # detemine simple by evaluating total L1 distance
             for wire_id, wire in enumerate(self.wires):
@@ -185,12 +189,13 @@ class Router:
                     cost[wire_id] += 5
                 
                 total_segments += routed_segments
-                total_possible_segments += possible_segments
             # TODO: show a final message on solved wires, pins etc
-            if total_segments == total_possible_segments:
-                print('Iter {}, simple first success, route {} / {} segments'.format(i, total_segments, total_possible_segments))
+            if total_segments == self.total_possible_segments:
+                if self.verbose:
+                    print('Iter {}, simple first success, route {} / {} segments'.format(i, total_segments, self.total_possible_segments))
             else:
-                print('Iter {}, simple first fail, route {} / {} segments'.format(i, total_segments, total_possible_segments))
+                if self.verbose:
+                    print('Iter {}, simple first fail, route {} / {} segments'.format(i, total_segments, self.total_possible_segments))
             if self.best_total_segments < total_segments:
                 self.best_total_segments = total_segments
                 self.best_routed_path = copy.deepcopy(self.routed_path)
@@ -375,7 +380,7 @@ if __name__ == '__main__':
     parser.add_argument('--infile', '-i', default='benchmarks/example.infile', help='input file') # yaml
     args = parser.parse_args()
 
-    router = Router(args.infile)
+    router = Router(args.infile, verbose=True)
 
     # test Lee Moore on single source and target
     # router.shortestPath([(10, 1)], [(2, 7)])
