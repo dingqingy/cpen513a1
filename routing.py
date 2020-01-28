@@ -9,8 +9,7 @@ import argparse
 class Router:
     def __init__(self, infile):
         self.grid_size, self.obstacles, self.wires = parse_input(infile)
-        self.resetInternalState()
-        self.best_routed_path = [[] for _ in range(len(self.wires))]
+        self.resetAll()
         self.startGUI()
         self.plot()
 
@@ -78,9 +77,15 @@ class Router:
 
     def resetVisual(self):
         # call reset method that clears all internal states
-        self.resetInternalState()
+        self.resetAll()
         self.plot()
         print('reset')
+
+    def resetAll(self):
+        self.resetInternalState()
+        # reset global state
+        self.best_routed_path = [[] for _ in range(len(self.wires))]
+        self.best_total_segments = 0
 
     def resetInternalState(self):
         self.routed_path = [[] for _ in range(len(self.wires))]
@@ -90,20 +95,22 @@ class Router:
     
     # Router functionality
     def routeAll(self):
-        best_total_segments = 0
+        self.best_total_segments = 0
 
         # traverse nets in linear order
         total_segments = self.linearOrder()
-        if total_segments > best_total_segments:
-            best_total_segments = total_segments
+        if total_segments > self.best_total_segments:
+            self.best_total_segments = total_segments
             self.best_routed_path = copy.deepcopy(self.routed_path)
 
         # solve simple nets (less pin and distance)
         total_segments = self.solveSimpleFirst()
-        if total_segments > best_total_segments:
-            best_total_segments = total_segments
+        if total_segments > self.best_total_segments:
+            self.best_total_segments = total_segments
             self.best_routed_path = copy.deepcopy(self.routed_path)
-
+        
+        # solve simple nets (less pin and distance)
+        self.solveSimpleFirstIterative()
         # maybe we will do 
 
     def linearOrder(self):
@@ -150,6 +157,43 @@ class Router:
         else:
             print('Simple First Failed, Route {} / {} segments'.format(total_segments, total_possible_segments))
         return total_segments
+
+    def solveSimpleFirstIterative(self, iter=5):
+        '''
+        Heristic: connect simple & failed wires first
+        simple is defined based on L1 distance between all pins within a wire
+        At the same time, iteratively increase the prioiry of failed wires
+        '''
+        cost = np.zeros(len(self.wires))
+        for i in range(iter):
+            self.resetInternalState()
+            total_segments = 0
+            total_possible_segments = 0
+
+            # detemine simple by evaluating total L1 distance
+            for wire_id, wire in enumerate(self.wires):
+                # self.net_ordering.put((totalL1Distance(wire), wire_id))
+                self.net_ordering.put((averageL1Distance(wire)-cost[wire_id], wire_id)) # lower score, higher priority          
+
+            while not self.net_ordering.empty():
+                _, wire_id = self.net_ordering.get()
+                routed_segments, self.routed_path[wire_id] = self.routeOneNet(self.wires[wire_id])
+                possible_segments = len(self.wires[wire_id])-1
+
+                # if we are not able to route this wire, we increase the cost
+                if routed_segments < possible_segments:
+                    cost[wire_id] += 5
+                
+                total_segments += routed_segments
+                total_possible_segments += possible_segments
+            # TODO: show a final message on solved wires, pins etc
+            if total_segments == total_possible_segments:
+                print('Iter {}, simple first success, route {} / {} segments'.format(i, total_segments, total_possible_segments))
+            else:
+                print('Iter {}, simple first fail, route {} / {} segments'.format(i, total_segments, total_possible_segments))
+            if self.best_total_segments < total_segments:
+                self.best_total_segments = total_segments
+                self.best_routed_path = copy.deepcopy(self.routed_path)
     
     # greedy that tries to connect as many pins as possible
     def routeOneNet(self, wire):
@@ -233,7 +277,7 @@ class Router:
                 return solution
             # expand all neighbours
             self.expand(coordinate)
-        print('Expansion list elements are drained. Not routable!')
+        # print('Expansion list elements are drained. Not routable!')
         return
 
     def expand(self, coordinate):
@@ -332,8 +376,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     router = Router(args.infile)
-    router.routeOneNet(router.wires[0])
-    router.plot()
 
     # test Lee Moore on single source and target
     # router.shortestPath([(10, 1)], [(2, 7)])
